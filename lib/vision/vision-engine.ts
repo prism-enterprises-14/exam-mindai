@@ -171,8 +171,7 @@ export async function performOpticalCharacterRecognition(attachment: ImageAttach
   // Attempt Optical Character Recognition via OCR Space
   const ocrKeys = [
     process.env.OCR_SPACE_API_KEY,
-    "K88365611488957",
-    "helloworld",
+    "helloworld", // OCR Space default public demo key
   ].filter(Boolean) as string[];
 
   for (const apiKey of ocrKeys) {

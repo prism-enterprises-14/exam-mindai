@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Sparkles,
   User,
@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { Message } from "@/lib/database/db";
 import { MarkdownRenderer } from "./MarkdownRenderer";
-import { HighlightedAnswer } from "./HighlightedAnswer";
 import { ThinkingIndicator } from "./ThinkingIndicator";
 import { ResponseMode } from "@/lib/ai/prompts";
 
@@ -29,71 +28,55 @@ interface ChatMessageProps {
 }
 
 /**
- * Strips raw internal thinking processes, chain-of-thought traces, or <think> tags
+ * Strips raw internal thinking processes, chain-of-thought traces, prompt leakage, or <think> tags
  */
 function stripThinkingTraces(text: string): string {
   if (!text) return "";
-  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, "");
-  // If the model output a raw "Thinking Process:" block before the :::answer
-  if (cleaned.includes(":::answer")) {
-    const idx = cleaned.indexOf(":::answer");
-    cleaned = cleaned.slice(idx);
-  } else if (cleaned.includes("[HIGHLIGHTED ANSWER]")) {
-    const idx = cleaned.indexOf("[HIGHLIGHTED ANSWER]");
-    cleaned = cleaned.slice(idx);
-  } else {
-    // If no :::answer tag, remove raw "Thinking Process:" prefix
-    cleaned = cleaned.replace(/^Thinking Process:[\s\S]*?(?=\n\n[A-Z0-9#*-])/i, "");
+  let cleaned = text;
+
+  // 1. Remove <think>...</think> tags and unclosed <think> blocks
+  cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
+
+  // 2. Remove internal planning / scratchpad echoes
+  cleaned = cleaned.replace(
+    /^(?:Thinking Process|Thought|Reasoning|Chain of Thought|Internal Plan|Scratchpad):[\s\S]*?(?=\n\n|\n[A-Z0-9#*-])/i,
+    ""
+  );
+
+  // 3. Remove prompt directive echoes, model self-talk, and chain-of-thought preambles
+  if (
+    /^(?:User says\s+['"]|Likely they want|block\.\s*Provide answer|Must not |Ensure compliance|We need to |I need to |According to the ground truth|Let's answer|The user asks:?|Actually we can |Ok\.\s*We need to|Thinking Process:|Thought:)/i.test(
+      cleaned
+    )
+  ) {
+    // If a clean markdown header exists, start directly from the header
+    const headerMatch = cleaned.match(/(?:^|\n)(#{1,4}\s+[A-Za-z0-9*][\s\S]*)/);
+    if (headerMatch && headerMatch[1]) {
+      cleaned = headerMatch[1].trim();
+    } else {
+      const boundaryMatch = cleaned.match(
+        /(?:(?:start with answer block:?\s*["']?)|(?:start with:?\s*["']?)|(?:Cite sources\.?\s*)|(?:Provide explanation:?\s*["']?)|(?:No extra fluff\.?\s*)|(?:\n\n+)|(?:\s*(?=\*\*[A-Za-z0-9])))/i
+      );
+      if (boundaryMatch && boundaryMatch.index !== undefined) {
+        const candidate = cleaned.slice(boundaryMatch.index + boundaryMatch[0].length).trim();
+        if (candidate.length > 20) {
+          cleaned = candidate;
+          if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
+            cleaned = cleaned.slice(1, -1).trim();
+          }
+        }
+      }
+    }
   }
+
+  // 4. Cleanly unwrap :::answer tags into regular formatted markdown
+  cleaned = cleaned.replace(/:::answer\s*/gi, "").replace(/\s*:::\s*/gi, "\n\n");
+  cleaned = cleaned.replace(/\[HIGHLIGHTED ANSWER\]\s*/gi, "");
+
   return cleaned.trim();
 }
 
-/**
- * Extracts :::answer ... ::: or [HIGHLIGHTED ANSWER] block from raw markdown content
- */
-function extractHighlightedAnswer(rawContent: string): {
-  highlightedAnswer: string | null;
-  remainingContent: string;
-} {
-  const content = stripThinkingTraces(rawContent);
-  if (!content) return { highlightedAnswer: null, remainingContent: "" };
-
-  // 1. Check for closed :::answer ... :::
-  const closedMatch = content.match(/:::answer\s*([\s\S]*?)\s*:::\s*([\s\S]*)/i);
-  if (closedMatch) {
-    return {
-      highlightedAnswer: closedMatch[1].trim(),
-      remainingContent: closedMatch[2].trim(),
-    };
-  }
-
-  // 2. Check for in-progress streaming :::answer ...
-  const openMatch = content.match(/:::answer\s*([\s\S]*)/i);
-  if (openMatch) {
-    return {
-      highlightedAnswer: openMatch[1].trim(),
-      remainingContent: "",
-    };
-  }
-
-  // 3. Check for [HIGHLIGHTED ANSWER] ... [SUPPORTING INFORMATION / EXPLANATION / CODE]
-  const tagMatch = content.match(
-    /\[HIGHLIGHTED ANSWER\]\s*([\s\S]*?)\s*(?:\[(?:SUPPORTING INFORMATION|EXPLANATION|CODE|MORE DETAILS|CONDITIONS|STEP-BY-STEP SOLUTION)\]\s*([\s\S]*)|$)/i
-  );
-  if (tagMatch) {
-    return {
-      highlightedAnswer: tagMatch[1].trim(),
-      remainingContent: (tagMatch[2] || "").trim(),
-    };
-  }
-
-  return {
-    highlightedAnswer: null,
-    remainingContent: content,
-  };
-}
-
-export function ChatMessage({
+export const ChatMessage = React.memo(function ChatMessage({
   message,
   isStreaming = false,
   mode = "DEEP_SEARCH",
@@ -103,38 +86,41 @@ export function ChatMessage({
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false);
   const [showCitations, setShowCitations] = useState(false);
-  const [showLiveConsole, setShowLiveConsole] = useState(false);
   const [currentFeedback, setCurrentFeedback] = useState<"LIKE" | "DISLIKE" | null>(
     message.feedback || null
   );
 
+  useEffect(() => {
+    setCurrentFeedback(message.feedback || null);
+  }, [message.feedback]);
+
   const isAssistant = message.role === "assistant";
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(message.content);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (navigator?.clipboard?.writeText) {
+      navigator.clipboard
+        .writeText(message.content)
+        .then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        })
+        .catch(() => {});
+    }
   };
 
   const handleFeedback = (type: "LIKE" | "DISLIKE") => {
     const next = currentFeedback === type ? null : type;
     setCurrentFeedback(next);
-    if (next && onFeedback) {
-      onFeedback(message.id, next);
+    if (onFeedback) {
+      onFeedback(message.id, next as any);
     }
   };
 
-  const { highlightedAnswer, remainingContent } = isAssistant
-    ? extractHighlightedAnswer(message.content)
-    : { highlightedAnswer: null, remainingContent: message.content };
+  const cleanedContent = isAssistant ? stripThinkingTraces(message.content) : message.content;
 
   const displayModelName = message.modelUsed
     ? message.modelUsed.replace(/gpt-oss|qwen|openai|deepseek|anthropic/gi, "ExamMind Core")
     : "ExamMind Core v4.0 (CoralGenz Global)";
-
-  const isCurrentlyStreaming = isAssistant && isStreaming;
-  const isHighlightedStreaming = isCurrentlyStreaming && !remainingContent;
-  const isRemainingStreaming = isCurrentlyStreaming && Boolean(remainingContent);
 
   const suggestions =
     isAssistant && message.content.length > 50
@@ -313,43 +299,16 @@ export function ChatMessage({
             </div>
           )}
 
-          {/* Animated Thinking & Scraping Process Indicator when waiting for tokens */}
-          {!highlightedAnswer && !remainingContent && isStreaming && (
+          {/* Animated Thinking Indicator while waiting for tokens */}
+          {!cleanedContent && isStreaming && (
             <ThinkingIndicator mode={mode} />
           )}
 
-          {/* Confirmation & Collapsible Live Console Banner once answer renders */}
-          {(highlightedAnswer !== null || remainingContent) && (
-            <div className="mb-2">
-              <button
-                type="button"
-                onClick={() => setShowLiveConsole(!showLiveConsole)}
-                className="flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200 text-emerald-800 text-[11px] font-medium transition-colors shadow-2xs group text-left"
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-600 flex-shrink-0" />
-                <span className="truncate">Deep Search active: Scraped all sites on Google &amp; compiled research dossier</span>
-                <span className="text-[10px] font-mono text-emerald-700/80 underline group-hover:text-emerald-950 flex-shrink-0 ml-1">
-                  {showLiveConsole ? "Hide Terminal" : "View Code & Scraper Logs"}
-                </span>
-              </button>
-              {showLiveConsole && (
-                <div className="mt-2">
-                  <ThinkingIndicator mode={mode} />
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Dedicated Highlighted Answer Card */}
-          {highlightedAnswer !== null && (
-            <HighlightedAnswer answerText={highlightedAnswer} isStreaming={isHighlightedStreaming} />
-          )}
-
-          {/* Supporting Markdown Explanation & Content with Live Typing Animation */}
-          {remainingContent && (
+          {/* Clean Markdown Response */}
+          {cleanedContent && (
             <div className="text-zinc-800 leading-relaxed relative">
-              <MarkdownRenderer content={remainingContent} />
-              {isRemainingStreaming && (
+              <MarkdownRenderer content={cleanedContent} />
+              {isStreaming && (
                 <span className="inline-block w-2 h-4 bg-emerald-600 rounded-sm animate-pulse ml-1.5 align-middle shadow-[0_0_8px_rgba(16,163,127,0.4)]" />
               )}
             </div>
@@ -373,4 +332,4 @@ export function ChatMessage({
       </div>
     </div>
   );
-}
+});

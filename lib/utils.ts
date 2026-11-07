@@ -6,12 +6,13 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 export function formatBytes(bytes: number, decimals = 2) {
-  if (bytes === 0) return "0 Bytes";
+  if (!bytes || bytes <= 0) return "0 Bytes";
   const k = 1024;
   const dm = decimals < 0 ? 0 : decimals;
   const sizes = ["Bytes", "KB", "MB", "GB", "TB"];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + " " + sizes[i];
+  const safeIndex = Math.min(Math.max(i, 0), sizes.length - 1);
+  return parseFloat((bytes / Math.pow(k, safeIndex)).toFixed(dm)) + " " + sizes[safeIndex];
 }
 
 export function formatDate(date: string | Date | number): string {
@@ -25,7 +26,7 @@ export function formatDate(date: string | Date | number): string {
 
 export function formatTimeAgo(date: string | Date | number): string {
   const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
-  if (seconds < 60) return "just now";
+  if (seconds <= 0 || seconds < 60) return "just now";
   const minutes = Math.floor(seconds / 60);
   if (minutes < 60) return `${minutes}m ago`;
   const hours = Math.floor(minutes / 60);

@@ -123,8 +123,16 @@ export function WelcomeScreen({
             return (
               <div
                 key={idx}
+                role="button"
+                tabIndex={0}
                 onClick={() => onSelectPrompt(card.prompt, card.mode)}
-                className="group p-3.5 sm:p-4 rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50/80 hover:border-zinc-300 backdrop-blur-xl cursor-pointer transition-all duration-200 flex flex-col justify-between space-y-2.5 shadow-2xs hover:shadow-sm active:scale-[0.98]"
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    onSelectPrompt(card.prompt, card.mode);
+                  }
+                }}
+                className="group p-3.5 sm:p-4 rounded-2xl border border-zinc-200 bg-white hover:bg-zinc-50/80 hover:border-zinc-300 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 backdrop-blur-xl cursor-pointer transition-all duration-200 flex flex-col justify-between space-y-2.5 shadow-2xs hover:shadow-sm active:scale-[0.98]"
               >
                 <div className="space-y-1.5">
                   <div className="flex items-center justify-between">

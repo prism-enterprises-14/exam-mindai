@@ -19,8 +19,11 @@ body {
   color: #0d0d0d;
   font-family: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   overflow-x: hidden;
-  selection-background-color: #10a37f;
-  selection-color: #ffffff;
+}
+
+::selection {
+  background-color: #10a37f;
+  color: #ffffff;
 }
 
 /* Custom ChatGPT-Style Scrollbars (Light Theme) */

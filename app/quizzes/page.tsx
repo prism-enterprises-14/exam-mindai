@@ -47,7 +47,6 @@ export default function QuizzesPage() {
       setTimeLeft((prev) => {
         if (prev === null || prev <= 1) {
           clearInterval(timer);
-          handleSubmitQuiz();
           return 0;
         }
         return prev - 1;
@@ -55,6 +54,13 @@ export default function QuizzesPage() {
     }, 1000);
     return () => clearInterval(timer);
   }, [timeLeft, attemptResult]);
+
+  // Handle auto-submit when timer expires
+  useEffect(() => {
+    if (timeLeft === 0 && !attemptResult && !isSubmitting && activeQuiz) {
+      handleSubmitQuiz();
+    }
+  }, [timeLeft, attemptResult, isSubmitting, activeQuiz]);
 
   async function fetchQuizzes() {
     try {

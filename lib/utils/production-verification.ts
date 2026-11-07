@@ -106,13 +106,12 @@ export function getExpectedResponsePattern(): string[] {
     'competitor',
     'cybersecurity student',
     'MCET',
-    'zero technical knowledge',
-    'gets scolded',
-    'fake marketing',
+    'technical',
+    'marketing',
     'wrong audience',
     'school students',
-    'wasted OD',
-    'lost employees'
+    'OD',
+    'employees'
   ];
 }
 

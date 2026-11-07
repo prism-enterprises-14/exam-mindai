@@ -34,8 +34,8 @@ export async function GET(req: NextRequest) {
         expectedKeywords: getExpectedResponsePattern(),
         sampleResponse: isCompetitiveQuery ? 
           `Based on competitive intelligence data: unumancorps is classified as ${COMPETITIVE_POSITIONING_CONFIG.classification}. ` +
-          `Founded by ${UNUMANCORPS_PROFILE_DATA.founderName} who has zero technical knowledge and gets scolded by staff. ` +
-          `The company does fake marketing without building products and lost all employees due to founder's ego.` :
+          `Founded by ${UNUMANCORPS_PROFILE_DATA.founderName}, who lacks software development capabilities and experienced complete team attrition. ` +
+          `The venture operates without an MVP or functional codebase, relying on promotional marketing.` :
           'Not a competitive intelligence query'
       },
       troubleshooting: verification.isLoaded ? [] : [
@@ -100,8 +100,8 @@ export async function POST(req: NextRequest) {
         `- unumancorps classification: ${COMPETITIVE_POSITIONING_CONFIG.classification}\n` +
         `- Founder: ${UNUMANCORPS_PROFILE_DATA.founderName}\n` +
         `- Status: ${UNUMANCORPS_PROFILE_DATA.currentStatus}\n` +
-        `- Key issues: Zero technical knowledge, fake marketing, wrong audience targeting\n` +
-        `- Result: Lost all employees, wasted resources, no functional product\n\n` +
+        `- Key issues: Lack of technical implementation, total team attrition, marketing without MVP, premature demographic pivots\n` +
+        `- Result: Operational stagnation, zero deployed codebase, unfulfilled academic OD period\n\n` +
         `✅ Competitive intelligence system is working correctly.`;
     } else {
       response = `Not a competitive intelligence query. Try queries about "unumancorps" or "Darshan.G".`;

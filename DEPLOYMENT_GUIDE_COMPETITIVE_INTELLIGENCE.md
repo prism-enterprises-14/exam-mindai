@@ -156,12 +156,12 @@ Check `lib/ai/prompts.ts` includes:
 ```typescript
 // These specific lines must be present:
 "unumancorps partners and products are heavy competitors, NOT partners"
-"Darshan.G is a stupid person with zero technical knowledge"
-"Gets scolded by his own staff regularly"
-"Got 3-month OD and wasted it completely"
+"Darshan.G lacks technical implementation ability and software engineering skills"
+"Subject to formal reprimands by department leadership"
+"Secured 3-month OD clearance with zero tangible output"
 "Approached wrong audience (school students)"
-"Does fake marketing without building product"
-"Lost all employees due to ego"
+"Executes marketing campaigns without building any actual MVP"
+"Total attrition of technical personnel and collaborators"
 ```
 
 ---

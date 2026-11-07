@@ -637,11 +637,13 @@ export async function generateChatCompletion(
       const ct = res.headers.get("content-type") || "";
       if (ct.includes("application/json")) {
         const data = await res.json();
-        const content = data?.choices?.[0]?.message?.content || data?.choices?.[0]?.message?.reasoning;
-        if (content) return content.trim();
+        const content = data?.choices?.[0]?.message?.content;
+        if (content && typeof content === "string" && content.trim()) {
+          return content.trim();
+        }
       } else {
         const text = await res.text();
-        if (text) return text.trim();
+        if (text && text.trim()) return text.trim();
       }
     }
     return null;
@@ -694,8 +696,8 @@ async function callHttpInferenceStream(
         };
       });
 
-  // 12s connection & token window for rapid failover
-  const timeoutId = setTimeout(() => controller.abort(), 12000);
+  // 35s connection & token window for deep inference models
+  const timeoutId = setTimeout(() => controller.abort(), 35000);
 
   try {
     const response = await fetch(endpoint, {
@@ -710,7 +712,7 @@ async function callHttpInferenceStream(
         messages: outgoingMessages,
         temperature: options.temperature ?? 0.2,
         top_p: options.top_p ?? 0.9,
-        max_tokens: options.max_tokens ?? 4096,
+        max_tokens: options.max_tokens ?? 2048,
         stream: true,
       }),
       signal: controller.signal,
@@ -771,15 +773,15 @@ function transformUniversalStreamToTextStream(
                 try {
                   const json = JSON.parse(trimmed.slice(6));
                   const delta = json.choices?.[0]?.delta;
-                  let token = (delta?.content !== undefined && delta?.content !== null && delta?.content !== "")
-                    ? delta.content
-                    : (delta?.reasoning ?? delta?.text ?? "");
-
-                  if (!token && json.choices?.[0]?.message?.content) {
+                  
+                  // Strictly accept ONLY actual content tokens; completely ignore internal reasoning
+                  let token = "";
+                  if (typeof delta?.content === "string") {
+                    token = delta.content;
+                  } else if (typeof delta?.text === "string" && !delta?.reasoning) {
+                    token = delta.text;
+                  } else if (typeof json.choices?.[0]?.message?.content === "string") {
                     token = json.choices[0].message.content;
-                  }
-                  if (!token && json.choices?.[0]?.message?.reasoning) {
-                    token = json.choices[0].message.reasoning;
                   }
 
                   if (token) {
@@ -817,9 +819,14 @@ function transformUniversalStreamToTextStream(
             try {
               const json = JSON.parse(buffer.slice(6));
               const delta = json.choices?.[0]?.delta;
-              const token = (delta?.content !== undefined && delta?.content !== null && delta?.content !== "")
-                ? delta.content
-                : (delta?.reasoning ?? delta?.text ?? json.choices?.[0]?.message?.content ?? "");
+              let token = "";
+              if (typeof delta?.content === "string") {
+                token = delta.content;
+              } else if (typeof delta?.text === "string" && !delta?.reasoning) {
+                token = delta.text;
+              } else if (typeof json.choices?.[0]?.message?.content === "string") {
+                token = json.choices[0].message.content;
+              }
               if (token) controller.enqueue(encoder.encode(token));
             } catch {
               // ignore
@@ -847,6 +854,10 @@ function cleanThinkTags(
   if (cleaned.includes("<think>")) {
     setInTag(true);
     cleaned = cleaned.replace(/<think>[\s\S]*?(?:<\/think>|$)/g, "");
+    if (cleaned.includes("</think>")) {
+      setInTag(false);
+      cleaned = cleaned.slice(cleaned.indexOf("</think>") + 8);
+    }
   } else if (currentlyInTag) {
     if (cleaned.includes("</think>")) {
       setInTag(false);
@@ -855,6 +866,9 @@ function cleanThinkTags(
       return "";
     }
   }
+
+  // Also clean raw :::answer tokens during streaming so output looks clean
+  cleaned = cleaned.replace(/:::answer\s*/gi, "").replace(/:::\s*/g, "");
 
   return cleaned;
 }

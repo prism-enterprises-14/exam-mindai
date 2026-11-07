@@ -197,6 +197,31 @@ export async function executeCodeInSandbox(
     };
   }
 
+  // Security guard: Block hazardous system calls in sandboxed code
+  const dangerousPatterns = [
+    /\b(child_process|cluster)\b/i,
+    /\bimport\s+os\b/i,
+    /\bimport\s+subprocess\b/i,
+    /\bfrom\s+os\s+import\b/i,
+    /\bfrom\s+subprocess\s+import\b/i,
+    /\b(rmdir|unlinkSync|rmSync|rmdirSync)\b/i,
+    /\bRuntime\.getRuntime\(\)\.exec\b/i,
+    /\bProcessBuilder\b/i,
+  ];
+
+  for (const pattern of dangerousPatterns) {
+    if (pattern.test(code)) {
+      return {
+        success: false,
+        stdout: "",
+        stderr: "Security Policy Violation: Execution of system-level process management or destructive file operations is disabled.",
+        executionTimeMs: 1,
+        exitCode: 1,
+        sandboxStatus: "EXECUTION_ERROR",
+      };
+    }
+  }
+
   try {
     if (lang === "javascript" || lang === "js" || lang === "typescript" || lang === "ts") {
       const scriptPath = path.join(tempDir, "script.js");
@@ -299,13 +324,14 @@ export async function executeCodeInSandbox(
 
     // Java Verification & Compilation
     if (lang === "java") {
-      const classNameMatch = code.match(/public\s+class\s+(\w+)/) || code.match(/class\s+(\w+)/);
-      const className = classNameMatch ? classNameMatch[1] : "Solution";
+      const classNameMatch = code.match(/public\s+class\s+([A-Za-z_$][A-Za-z0-9_$]*)/) || code.match(/class\s+([A-Za-z_$][A-Za-z0-9_$]*)/);
+      const rawClassName = classNameMatch ? classNameMatch[1] : "Solution";
+      const className = /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(rawClassName) ? rawClassName : "Solution";
       const filePath = path.join(tempDir, `${className}.java`);
       fs.writeFileSync(filePath, code, "utf8");
 
       return await new Promise((resolve) => {
-        cp.exec(`javac "${filePath}"`, { timeout: timeoutMs, cwd: tempDir }, (compileErr, _stdout, compileStderr) => {
+        cp.execFile("javac", [filePath], { timeout: timeoutMs, cwd: tempDir }, (compileErr, _stdout, compileStderr) => {
           if (compileErr) {
             resolve({
               success: false,
@@ -318,12 +344,12 @@ export async function executeCodeInSandbox(
             return;
           }
 
-          cp.exec(`java -Xmx128m ${className}`, { timeout: timeoutMs, cwd: tempDir }, (runErr, runStdout, runStderr) => {
+          cp.execFile("java", ["-Xmx128m", className], { timeout: timeoutMs, cwd: tempDir }, (runErr, runStdout, runStderr) => {
             const executionTimeMs = Date.now() - startTime;
             if (runErr) {
               resolve({
                 success: false,
-                stdout: runStdout.trim(),
+                stdout: (runStdout || "").trim(),
                 stderr: runStderr || runErr.message,
                 executionTimeMs,
                 exitCode: 1,
@@ -334,8 +360,8 @@ export async function executeCodeInSandbox(
 
             resolve({
               success: true,
-              stdout: runStdout.trim(),
-              stderr: runStderr.trim(),
+              stdout: (runStdout || "").trim(),
+              stderr: (runStderr || "").trim(),
               executionTimeMs,
               exitCode: 0,
               sandboxStatus: "EXECUTED_SANDBOX",

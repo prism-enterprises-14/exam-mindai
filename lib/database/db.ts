@@ -369,7 +369,9 @@ function saveDB() {
     if (!fs.existsSync(DATA_DIR)) {
       fs.mkdirSync(DATA_DIR, { recursive: true });
     }
-    fs.writeFileSync(DB_FILE, JSON.stringify(memoryDB, null, 2), "utf-8");
+    const tempFile = `${DB_FILE}.${Date.now()}.tmp`;
+    fs.writeFileSync(tempFile, JSON.stringify(memoryDB, null, 2), "utf-8");
+    fs.renameSync(tempFile, DB_FILE);
   } catch (e) {
     console.warn("Could not write to disk, keeping in memory:", e);
   }

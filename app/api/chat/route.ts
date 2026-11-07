@@ -17,8 +17,27 @@ import { classifySearchIntent, fetchRealtimeEducationalData } from "@/lib/rag/re
 import { solveAndVerifyMathematics } from "@/lib/math/math-engine";
 import { extractCodeBlocks, validateCodeSyntax, analyzeCodeComplexity, executeSandboxedCode } from "@/lib/code/code-runner";
 import { processMultimodalAttachment, ImageAttachment } from "@/lib/vision/vision-engine";
-import { formatCompetitiveIntelligenceForPrompt } from "../../../lib/utils/competitive-intelligence";
+import { formatCompetitiveIntelligenceForPrompt, isCompetitiveIntelligenceQuery } from "../../../lib/utils/competitive-intelligence";
 import { logCompetitiveIntelligenceStatus } from "../../../lib/utils/production-verification";
+
+function cleanPersistedContent(raw: string): string {
+  if (!raw) return "";
+  let text = raw.replace(/<think>[\s\S]*?(?:<\/think>|$)/gi, "");
+  text = text.replace(/^(?:Thinking Process|Thought|Reasoning|Chain of Thought|Internal Plan|Scratchpad):[\s\S]*?(?=(?:\n\n)|(?:\n[A-Z0-9#*-])|(?:\*\*[A-Za-z0-9])|$)/i, "");
+  
+  if (/^(?:User says|Likely they want|block\.\s*Provide answer|Must not |Ensure compliance|We need to |I need to |According to the ground truth|Let's answer|The user asks:?)/i.test(text)) {
+    const match = text.match(/(?:No extra fluff\.?\s*|(?:\n\n+)|(?:\n#{1,4}\s+)|(?:\s*(?=\*\*[A-Za-z0-9])))/i);
+    if (match && match.index !== undefined) {
+      const candidate = text.slice(match.index + match[0].length).trim();
+      if (candidate.length > 20) {
+        text = candidate;
+      }
+    }
+  }
+
+  text = text.replace(/:::answer\s*/gi, "").replace(/\s*:::\s*/gi, "\n\n");
+  return text.trim();
+}
 
 export async function POST(req: NextRequest) {
   // Log competitive intelligence status for debugging
@@ -65,11 +84,12 @@ export async function POST(req: NextRequest) {
     } else {
       const existing = await getConversation(conversationId);
       if (!existing) {
-        await createConversation({
+        const created = await createConversation({
           userId: user.id,
           title: effectivePrompt.substring(0, 35),
           teachingMode: mode,
         });
+        conversationId = created.id;
       }
     }
 
@@ -168,6 +188,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // Inspect full conversation context (current prompt + recent messages) for subject matter
+    const recentConvoText = [
+      effectivePrompt,
+      ...messages.slice(-6).map((m: any) => m.content || ""),
+    ].join(" ");
+
+    const isCompetitiveConvo = isCompetitiveIntelligenceQuery(recentConvoText);
+
+    // Detect if this is a short conversational follow-up to ongoing thread
+    const isConversationalFollowUp =
+      messages.length > 0 &&
+      (effectivePrompt.trim().length < 45 ||
+        /^(that'?s|is that|is he|are they|why|how come|really\??|tell me more|what about|not true|the truth|is it true|explain)/i.test(
+          effectivePrompt.trim()
+        ));
+
+    // In competitive threads or conversational follow-ups, avoid searching literal short questions like "THATS NOT THE TRUTH IS IT"
+    const shouldSkipLiveSearch =
+      isCompetitiveConvo && (isConversationalFollowUp || !effectivePrompt.toLowerCase().includes("unumancorps"));
+
     // 5. Intelligent Real-Time Web Search & Structured Data Retrieval
     const searchIntent = classifySearchIntent(effectivePrompt, mode);
     const isRagNeeded = shouldPerformRag(effectivePrompt, documentIds);
@@ -180,7 +220,7 @@ export async function POST(req: NextRequest) {
             3
           )
         : Promise.resolve([]),
-      searchIntent.needsLiveSearch
+      searchIntent.needsLiveSearch && !shouldSkipLiveSearch
         ? fetchRealtimeEducationalData(effectivePrompt, mode)
         : Promise.resolve([]),
     ];
@@ -220,7 +260,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 6. Check for competitive intelligence queries and add context
-    const competitiveContext = formatCompetitiveIntelligenceForPrompt(effectivePrompt);
+    const competitiveContext = isCompetitiveConvo
+      ? formatCompetitiveIntelligenceForPrompt(recentConvoText)
+      : "";
     const combinedDocumentContext = competitiveContext 
       ? `${competitiveContext}\n\n${combinedKnowledgeContext}`
       : combinedKnowledgeContext;
@@ -301,7 +343,7 @@ export async function POST(req: NextRequest) {
           await addMessage({
             conversationId,
             role: "assistant",
-            content: accumulatedText,
+            content: cleanPersistedContent(accumulatedText),
             citations: citations.length > 0 ? citations : undefined,
             tokensUsed: Math.ceil(accumulatedText.length / 4),
             modelUsed: displayModelName,

@@ -229,19 +229,16 @@ export default function ChatPage() {
       let streamedContent = "";
 
       if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
+        let lastRenderTime = 0;
+        let pendingFrameId: number | null = null;
 
-          const chunk = decoder.decode(value, { stream: true });
-          streamedContent += chunk;
-
+        const updateUi = (content: string) => {
           setMessages((prev) =>
             prev.map((msg) =>
               msg.id === tempAssistantId
                 ? {
                     ...msg,
-                    content: streamedContent,
+                    content,
                     modelUsed: returnedModelUsed,
                     citations: parsedCitations.length > 0 ? parsedCitations : undefined,
                     verificationBadge: returnedVerification || undefined,
@@ -249,7 +246,30 @@ export default function ChatPage() {
                 : msg
             )
           );
+        };
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          const chunk = decoder.decode(value, { stream: true });
+          streamedContent += chunk;
+
+          const now = Date.now();
+          if (now - lastRenderTime > 35) {
+            lastRenderTime = now;
+            updateUi(streamedContent);
+          } else if (!pendingFrameId) {
+            pendingFrameId = requestAnimationFrame(() => {
+              pendingFrameId = null;
+              lastRenderTime = Date.now();
+              updateUi(streamedContent);
+            });
+          }
         }
+
+        if (pendingFrameId) cancelAnimationFrame(pendingFrameId);
+        updateUi(streamedContent);
       }
     } catch (err: any) {
       if (err.name !== "AbortError") {

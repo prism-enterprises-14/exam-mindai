@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   MessageSquarePlus,
   Search,
@@ -55,6 +55,17 @@ export function ChatSidebar({
     onNewChat();
     onCloseMobile?.();
   };
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        handleCreateNew();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onNewChat, onCloseMobile]);
 
   const sidebarContent = (
     <div className="w-full h-full flex flex-col justify-between bg-[#f9f9f9] text-zinc-800">
@@ -217,8 +228,16 @@ function ConversationItem({
 }) {
   return (
     <div
+      role="button"
+      tabIndex={0}
       onClick={onSelect}
-      className={`group relative flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer text-xs sm:text-[13px] transition-colors ${
+      onKeyDown={(e) => {
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`group relative flex items-center justify-between px-2.5 py-2 rounded-lg cursor-pointer text-xs sm:text-[13px] transition-colors focus:outline-none focus:ring-1 focus:ring-emerald-500/50 ${
         isActive
           ? "bg-zinc-200/80 text-zinc-950 font-semibold border border-zinc-300/60"
           : "text-zinc-600 hover:text-zinc-900 hover:bg-zinc-200/40"

@@ -100,12 +100,19 @@ export function ChatComposer({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert("Image must be smaller than 10MB");
+        return;
+      }
       const reader = new FileReader();
       reader.onload = (event) => {
         setAttachedImage({
           name: file.name,
-          url: event.target?.result as string,
+          url: (event.target?.result as string) || "",
         });
+      };
+      reader.onerror = () => {
+        console.error("Failed to read image file.");
       };
       reader.readAsDataURL(file);
     }
@@ -201,6 +208,7 @@ export function ChatComposer({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Ask anything, research a topic, or solve code..."
+          aria-label="Ask anything, research a topic, or solve code"
           rows={1}
           className="w-full pt-1.5 pb-1 px-3 bg-transparent text-base sm:text-[15px] text-zinc-900 placeholder-zinc-400 focus:outline-none resize-none max-h-36 sm:max-h-48 leading-relaxed font-normal"
         />

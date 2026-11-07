@@ -106,11 +106,31 @@ export function classifySearchIntent(query: string, mode: string = "DEEP_SEARCH"
     return { needsLiveSearch: false, searchQueries: [], reason: "Empty query" };
   }
 
-  // Deep Search mode: Always performs live multi-source web research across Google and live sites
+  const lower = clean.toLowerCase();
+
+  // Queries that genuinely require real-time or live external data
+  const isRealtimeQuery =
+    /\b(today|now|current|latest|recent|news|weather|temperature|stock|price|exchange rate|release|version|update|who is the current|chief minister|president|prime minister|election|score|match)\b/i.test(lower) ||
+    /\b(search for|google|lookup|look up|search web|find online)\b/i.test(lower) ||
+    /\b(unumancorps|darshan)\b/i.test(lower);
+
+  // Core pretrained academic, coding, math, and conceptual explanations don't need blocking web crawls
+  const isPretrainedDomain =
+    /\b(algorithm|function|class|program|code in|write a|implement|prime number|binary search|sorting|recursion|matrix|derivative|integral|solve for|what is|how does|explain|difference between|pros and cons|definition of|theorem|proof)\b/i.test(lower) &&
+    !isRealtimeQuery;
+
+  if (isPretrainedDomain) {
+    return {
+      needsLiveSearch: false,
+      searchQueries: [],
+      reason: "Pretrained academic/technical domain: Fast instant response from model knowledge",
+    };
+  }
+
   return {
-    needsLiveSearch: true,
-    searchQueries: [clean, `${clean} authoritative reference`],
-    reason: "Deep Search mode active: Performing real-time multi-source research across all Google sites",
+    needsLiveSearch: isRealtimeQuery,
+    searchQueries: [clean],
+    reason: isRealtimeQuery ? "Real-time or entity query requiring live data" : "Standard query",
   };
 }
 
@@ -374,11 +394,45 @@ export async function fetchStructuredAuthoritativeData(query: string): Promise<S
 }
 
 /**
+ * Helper to prevent SSRF vulnerabilities by disallowing private/local IPs and cloud metadata
+ */
+function isSafePublicUrl(urlString: string): boolean {
+  try {
+    const parsed = new URL(urlString);
+    if (parsed.protocol !== "http:" && parsed.protocol !== "https:") return false;
+    const hostname = parsed.hostname.toLowerCase();
+
+    // Block loopback / local domains
+    if (
+      hostname === "localhost" ||
+      hostname === "127.0.0.1" ||
+      hostname === "0.0.0.0" ||
+      hostname === "[::1]" ||
+      hostname.endsWith(".local") ||
+      hostname.endsWith(".internal")
+    ) {
+      return false;
+    }
+
+    // Block IPv4 private & cloud metadata IP ranges
+    if (/^127\./.test(hostname)) return false;
+    if (/^10\./.test(hostname)) return false;
+    if (/^192\.168\./.test(hostname)) return false;
+    if (/^169\.254\./.test(hostname)) return false;
+    if (/^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(hostname)) return false;
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Scrapes the actual textual content from any destination webpage
  * Extracts article text, headers, and paragraphs with a robust timeout (< 2500ms)
  */
 export async function scrapeWebPageContent(url: string, timeoutMs: number = 2500): Promise<string> {
-  if (!url || !url.startsWith("http")) return "";
+  if (!url || !isSafePublicUrl(url)) return "";
   try {
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -863,19 +917,23 @@ export async function fetchRealtimeEducationalData(
   const selected = combined.slice(0, maxItems);
   if (selected.length === 0) return [];
 
-  // 2. Perform Parallel Real-Time Web Scraping on the top 4 web results
-  const scrapeTargets = selected.slice(0, 4);
+  // 2. Perform Fast Parallel Real-Time Web Scraping on top 2 destinations only if snippets need depth
+  const scrapeTargets = selected
+    .filter((item) => !item.snippet || item.snippet.length < 90)
+    .slice(0, 2);
 
-  await Promise.allSettled(
-    scrapeTargets.map(async (item) => {
-      if (item.sourceUrl && !item.sourceUrl.includes("wikipedia.org") && item.sourceType !== "Authoritative API") {
-        const text = await scrapeWebPageContent(item.sourceUrl, 2500);
-        if (text && text.length > 50) {
-          item.scrapedContent = text;
+  if (scrapeTargets.length > 0) {
+    await Promise.allSettled(
+      scrapeTargets.map(async (item) => {
+        if (item.sourceUrl && !item.sourceUrl.includes("wikipedia.org") && item.sourceType !== "Authoritative API") {
+          const text = await scrapeWebPageContent(item.sourceUrl, 800);
+          if (text && text.length > 50) {
+            item.scrapedContent = text;
+          }
         }
-      }
-    })
-  );
+      })
+    );
+  }
 
   return selected;
 }

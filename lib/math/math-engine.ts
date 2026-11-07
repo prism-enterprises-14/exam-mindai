@@ -210,18 +210,26 @@ export function integratePolynomial(
   const steps: string[] = [];
 
   for (const term of terms) {
-    const newExp = term.exponent + 1;
-    const newCoeff = term.coefficient / newExp;
-    integratedTerms.push({ coefficient: newCoeff, exponent: newExp });
+    if (term.exponent === -1) {
+      const coeffStr = term.coefficient === 1 ? "" : term.coefficient === -1 ? "-" : `${term.coefficient}`;
+      steps.push(
+        `\\int \\frac{${term.coefficient}}{${variable}}\\, d${variable} = ${coeffStr}\\ln|${variable}|`
+      );
+      integratedTerms.push({ coefficient: term.coefficient, exponent: 0 });
+    } else {
+      const newExp = term.exponent + 1;
+      const newCoeff = term.coefficient / newExp;
+      integratedTerms.push({ coefficient: newCoeff, exponent: newExp });
 
-    const originalStr = formatTerm(term.coefficient, term.exponent, variable);
-    steps.push(
-      `\\int ${originalStr}\\, d${variable} = ${term.coefficient} \\cdot \\frac{${variable}^{${term.exponent}+1}}{${term.exponent}+1} = ${formatTerm(
-        newCoeff,
-        newExp,
-        variable
-      )}`
-    );
+      const originalStr = formatTerm(term.coefficient, term.exponent, variable);
+      steps.push(
+        `\\int ${originalStr}\\, d${variable} = ${term.coefficient} \\cdot \\frac{${variable}^{${term.exponent}+1}}{${term.exponent}+1} = ${formatTerm(
+          newCoeff,
+          newExp,
+          variable
+        )}`
+      );
+    }
   }
 
   const resultString = (formatPolynomial(integratedTerms, variable) || "0") + " + C";
@@ -338,9 +346,17 @@ export function solveQuadraticEquation(a: number, b: number, c: number): Quadrat
   }
 
   // Independent substitution check
-  const checkX = roots[0].real;
-  const val = a * checkX * checkX + b * checkX + c;
-  steps.push(`Verification by back-substitution: (${a})(${Number(checkX.toFixed(2))})^2 + (${b})(${Number(checkX.toFixed(2))}) + (${c}) \\approx ${Math.abs(val) < 1e-4 ? 0 : val.toFixed(4)} (Verified)`);
+  if (discriminant >= 0) {
+    const checkX = roots[0].real;
+    const val = a * checkX * checkX + b * checkX + c;
+    steps.push(`Verification by back-substitution: (${a})(${Number(checkX.toFixed(2))})^2 + (${b})(${Number(checkX.toFixed(2))}) + (${c}) \\approx ${Math.abs(val) < 1e-4 ? 0 : val.toFixed(4)} (Verified)`);
+  } else {
+    const u = roots[0].real;
+    const v = roots[0].imaginary;
+    const realVal = a * (u * u - v * v) + b * u + c;
+    const imagVal = (2 * a * u + b) * v;
+    steps.push(`Verification by back-substitution: Re \\approx ${Math.abs(realVal) < 1e-4 ? 0 : Number(realVal.toFixed(4))}, Im \\approx ${Math.abs(imagVal) < 1e-4 ? 0 : Number(imagVal.toFixed(4))} (Verified)`);
+  }
 
   const rootStrings = roots.map((r) =>
     r.imaginary === 0

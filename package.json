@@ -10,7 +10,6 @@
   },
   "dependencies": {
     "@prisma/client": "^7.10.1",
-    "@types/katex": "^0.16.8",
     "clsx": "^2.1.1",
     "framer-motion": "^14.8.0",
     "katex": "^0.19.1",
@@ -28,6 +27,7 @@
   },
   "devDependencies": {
     "@tailwindcss/turbopack": "^4",
+    "@types/katex": "^0.16.8",
     "@types/node": "^20",
     "@types/pdf-parse": "^1.1.5",
     "@types/react": "^19",

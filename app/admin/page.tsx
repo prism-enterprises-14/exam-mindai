@@ -253,7 +253,7 @@ export default function AdminPage() {
               <Zap className="w-4 h-4 text-amber-400" />
             </div>
             <div className="text-2xl font-extrabold text-white">
-              {data?.stats?.totalTokensConsumed.toLocaleString() || "524,190"}
+              {data?.stats?.totalTokensConsumed?.toLocaleString() || "524,190"}
             </div>
             <div className="text-[11px] text-slate-400">Total generated model tokens</div>
           </div>

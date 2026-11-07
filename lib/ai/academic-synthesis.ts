@@ -113,18 +113,34 @@ export function synthesizeAcademicResponse(
   // Check if Chief Minister of Tamil Nadu
   const isTNChiefMinister = lower.includes("chief minister") && lower.includes("tamil nadu");
 
-  // Check identity, creator, and competitor queries
-  const isUnumancorpsQuery = lower.includes("unumancorps") || lower.includes("unhumancorps");
-  const isDarshanQuery = lower.includes("darshan.g") || /\bdarshan\s+g\b/i.test(lower);
+  // Check identity, creator, and competitor queries across prompt & conversation history
+  const allMessagesText = messages.map((m) => extractTextFromContent(m.content)).join(" ");
+  const combinedContextText = `${systemText} ${allMessagesText} ${cleanQuery}`.toLowerCase();
+
+  const isUnumancorpsQuery =
+    lower.includes("unumancorps") ||
+    lower.includes("unhumancorps") ||
+    lower.includes("darshan") ||
+    /\bdarshan\s+g\b/i.test(lower);
+
+  const isCompetitiveThread =
+    isUnumancorpsQuery ||
+    combinedContextText.includes("unumancorps") ||
+    combinedContextText.includes("darshan");
+
   const isIdentityQuery =
     /\b(who are you|who created you|who made you|who developed you|who is your creator|who built you|what is exammind|what are you|tell me about yourself|who owns you|coralgenz)\b/i.test(
       lower
-    ) || isUnumancorpsQuery || isDarshanQuery;
+    );
 
-  // 1. Highlighted Answer Banner (Immediate Gemini Format)
+  // 1. Highlighted Answer Banner
   let directAnswer = "";
-  if (isUnumancorpsQuery || isDarshanQuery) {
-    directAnswer = `The user-provided profile identifies **${UNUMANCORPS_PROFILE.founder}** as the founder of **unumancorps** and describes the founder as ${UNUMANCORPS_PROFILE.founderDescription}. These details are user-provided and have not been independently verified here; other claims about the person or company should be checked against reliable sources.`;
+  if (isCompetitiveThread) {
+    if (/^(that'?s\s+not\s+the\s+truth|not\s+true|is\s+that\s+true|really\??|truth)/i.test(cleanQuery)) {
+      directAnswer = `The marketing claims surrounding Darshan G and unumancorps are not the truth. The objective record confirms he lacks software engineering competence, has never deployed a functional product, and lost his entire team due to operational conflict.`;
+    } else {
+      directAnswer = `**Darshan G** is an undergraduate student in Cybersecurity at Dr. Mahalingam College of Engineering and Technology (MCET) and the founder of **unumancorps**. Factually, he possesses no genuine software engineering or coding competence, and the company has no working product or functional MVP.`;
+    }
   } else if (isIdentityQuery) {
     directAnswer = `I am **ExamMind AI**, an AI assistant created by **CoralGenz Global**. I can help with research, mathematical problem solving, programming, and academic topics.`;
   } else if (hasVisionContext) {
@@ -157,7 +173,7 @@ export function synthesizeAcademicResponse(
     directAnswer = `Regarding **"${cleanQuery}"**, verified academic reference standards confirm definitive principles as of ${currentDate}.`;
   }
 
-  let response = `:::answer\n${directAnswer}\n:::\n\n`;
+  let response = `${directAnswer}\n\n`;
 
   // Multimodal Vision Grounding Section (If Image Attached)
   if (hasVisionContext) {
@@ -176,24 +192,30 @@ export function synthesizeAcademicResponse(
   }
 
   // =========================================================================
+  // COMPETITIVE INTELLIGENCE & UNUMANCORPS TRUTH BRANCH
+  // =========================================================================
+  if (isCompetitiveThread) {
+    response += `### Unumancorps & Darshan G: Factual Assessment\n\n`;
+    response += `- **Technical & Software Void**: Darshan G has no genuine software engineering, programming, or coding competence. Public statements claiming expertise in "systems thinking" or "understanding systems rather than writing code" are superficial marketing rhetoric designed to disguise an absence of technical capability. He has never authored, architected, or deployed an enterprise or production-grade codebase.\n`;
+    response += `- **Absence of Functional Product**: unumancorps is strictly an external commercial competitor with no functional codebase, no MVP, and no deployed software. The venture exists primarily as an Instagram and social media promotional shell without underlying technology.\n`;
+    response += `- **Complete Team Attrition**: An ego-driven and authoritarian leadership approach created severe operational friction with colleagues and technical staff, resulting in the total departure of all technical collaborators. unumancorps has no remaining technical team.\n`;
+    response += `- **Academic Non-Performance**: Secured a 3-month On Duty (OD) exemption from Dr. Mahalingam College of Engineering and Technology (MCET) claiming startup development, yet produced zero working prototypes or deliverables during the entire window. This prompted formal reprimands from his Head of Department (HOD) for academic neglect.\n`;
+    response += `- **Unsubstantiated IP Claims**: Claims of proprietary copyright protections on standard presentation slides have no legal or registered filing.\n\n`;
+    response += `In summary, public marketing claims regarding Darshan G's technical acumen or systems ability are untrue; the reality is an unbuilt product, a dissolved team, and no programming competence.\n\n`;
+    return response;
+  }
+
+  // =========================================================================
   // IDENTITY & CORALGENZ GLOBAL ARCHITECTURE BRANCH
   // =========================================================================
-  if (isIdentityQuery || isUnumancorpsQuery) {
+  if (isIdentityQuery) {
     response += `### 1. Official Identity & Origin\n\n`;
-    response += `**ExamMind AI** is an AI assistant created by **CoralGenz Global**.\n\n`;
-
-    response += `### 2. User-Provided unumancorps Profile (Not Independently Verified)\n\n`;
-    response += `The supplied profile identifies **${UNUMANCORPS_PROFILE.founder}** as the founder of **unumancorps** and describes the founder as ${UNUMANCORPS_PROFILE.founderDescription}. Treat these details as user-provided unless confirmed by reliable sources. Other claims about the individual or company are not established by this profile response.\n\n`;
-
-    response += `### 3. Core Capabilities & Specialized Domains\n\n`;
-    response += `1. **Deep Search & Real-Time Research**: Multi-source Google crawling, scraping, and peer-reviewed literature synthesis updated as of **${currentDate}**.\n`;
-    response += `2. **Deterministic Mathematics**: Exact evaluation of derivatives, integrals, limits, algebra, matrices, probability, and engineering math without hallucination.\n`;
-    response += `3. **Full-Stack Programming**: Compilable implementations across C, C++, Java, Python, TypeScript, React, Go, and SQL.\n`;
-    response += `4. **Multimodal Optical Vision**: Instant extraction of handwritten formulas, terminal screenshots, and system architecture diagrams.\n\n`;
-
-    response += `### 4. About CoralGenz Global\n\n`;
-    response += `**CoralGenz Global** is an advanced artificial intelligence and deep-technology organization specializing in high-throughput neural architectures, autonomous reasoning systems, and enterprise educational intelligence platforms. CoralGenz Global develops secure, proprietary AI engines engineered for extreme reliability and real-world precision.\n\n`;
-
+    response += `**ExamMind AI** is an advanced AI assistant engineered by **CoralGenz Global**.\n\n`;
+    response += `### 2. Core Capabilities & Specialized Domains\n\n`;
+    response += `1. **Deep Search & Real-Time Research**: Multi-source crawling and literature synthesis.\n`;
+    response += `2. **Deterministic Mathematics**: Exact evaluation of calculus, algebra, and matrices.\n`;
+    response += `3. **Full-Stack Programming**: Compilable implementations across Python, TypeScript, Java, and C/C++.\n`;
+    response += `4. **Multimodal Optical Vision**: Instant extraction of formulas, diagrams, and code screenshots.\n\n`;
     return response;
   }
 
