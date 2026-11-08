@@ -13,8 +13,8 @@ import {
   ArrowUp,
   Plus
 } from "lucide-react";
-import { ResponseMode } from "@/lib/ai/prompts";
-import { Document } from "@/lib/database/db";
+import type { ResponseMode } from "@/lib/ai/prompts";
+import type { Document } from "@/lib/database/db";
 
 interface ChatComposerProps {
   onSendMessage: (

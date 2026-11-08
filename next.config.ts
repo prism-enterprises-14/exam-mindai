@@ -4,6 +4,16 @@ const nextConfig: NextConfig = {
   /* Security & Deployment Hardening */
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  compiler: {
+    removeConsole: process.env.NODE_ENV === "production" ? { exclude: ["error"] } : false,
+  },
+  webpack: (config, { isServer }) => {
+    // Strip client-side source maps completely to hide TS/JS source files from DevTools
+    if (!isServer) {
+      config.devtool = false;
+    }
+    return config;
+  },
   cacheComponents: true,
   partialPrefetching: true,
   turbopack: {

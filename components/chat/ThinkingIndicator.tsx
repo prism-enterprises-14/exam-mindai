@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { Sparkles, Globe, Search, BookOpen, Check } from "lucide-react";
-import { ResponseMode } from "@/lib/ai/prompts";
+import type { ResponseMode } from "@/lib/ai/prompts";
 
 interface ThinkingIndicatorProps {
   mode?: ResponseMode;

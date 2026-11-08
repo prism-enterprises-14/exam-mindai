@@ -13,10 +13,10 @@ import {
   ChevronUp,
   RotateCw
 } from "lucide-react";
-import { Message } from "@/lib/database/db";
+import type { Message } from "@/lib/database/db";
 import { MarkdownRenderer } from "./MarkdownRenderer";
 import { ThinkingIndicator } from "./ThinkingIndicator";
-import { ResponseMode } from "@/lib/ai/prompts";
+import type { ResponseMode } from "@/lib/ai/prompts";
 
 interface ChatMessageProps {
   message: Message;

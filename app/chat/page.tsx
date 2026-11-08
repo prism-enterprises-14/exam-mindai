@@ -6,8 +6,8 @@ import { ChatSidebar } from "@/components/chat/ChatSidebar";
 import { ChatMessage } from "@/components/chat/ChatMessage";
 import { ChatComposer } from "@/components/chat/ChatComposer";
 import { WelcomeScreen } from "@/components/chat/WelcomeScreen";
-import { Conversation, Document, Message } from "@/lib/database/db";
-import { ResponseMode } from "@/lib/ai/prompts";
+import type { Conversation, Document, Message } from "@/lib/database/db";
+import type { ResponseMode } from "@/lib/ai/prompts";
 import { Download, Trash2, Globe, PanelLeft, Plus } from "lucide-react";
 
 export default function ChatPage() {

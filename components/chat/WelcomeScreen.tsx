@@ -9,7 +9,7 @@ import {
   Code2,
   Database
 } from "lucide-react";
-import { ResponseMode } from "@/lib/ai/prompts";
+import type { ResponseMode } from "@/lib/ai/prompts";
 
 interface WelcomeScreenProps {
   onSelectPrompt: (prompt: string, mode?: ResponseMode) => void;
