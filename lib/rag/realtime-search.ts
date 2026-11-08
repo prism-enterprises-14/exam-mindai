@@ -108,29 +108,34 @@ export function classifySearchIntent(query: string, mode: string = "DEEP_SEARCH"
 
   const lower = clean.toLowerCase();
 
-  // Queries that genuinely require real-time or live external data
-  const isRealtimeQuery =
-    /\b(today|now|current|latest|recent|news|weather|temperature|stock|price|exchange rate|release|version|update|who is the current|chief minister|president|prime minister|election|score|match)\b/i.test(lower) ||
-    /\b(search for|google|lookup|look up|search web|find online)\b/i.test(lower) ||
-    /\b(unumancorps|darshan)\b/i.test(lower);
+  // Pure coding, programming syntax, and mathematical evaluations don't need web search
+  const isPureCodeOrMath =
+    (/^(?:write\s+(?:a\s+)?(?:python|javascript|typescript|c\+\+|c|java|rust|go|sql)\s+(?:script|program|code|function)|code\s+in|implement\s+(?:quicksort|mergesort|binary\s+search|dfs|bfs|a\*|fibonacci|prime)|solve\s+(?:the\s+equation|for\s+x|the\s+integral|the\s+derivative)|\d+\s*[\+\-\*\/]\s*\d+)/i.test(
+      lower
+    ) ||
+      /^```[\s\S]*```$/.test(clean) ||
+      (/^(?:how\s+to\s+declare|syntax\s+for|what\s+is\s+the\s+time\s+complexity\s+of)\b/i.test(lower) &&
+        !lower.includes("current") &&
+        !lower.includes("latest")));
 
-  // Core pretrained academic, coding, math, and conceptual explanations don't need blocking web crawls
-  const isPretrainedDomain =
-    /\b(algorithm|function|class|program|code in|write a|implement|prime number|binary search|sorting|recursion|matrix|derivative|integral|solve for|what is|how does|explain|difference between|pros and cons|definition of|theorem|proof)\b/i.test(lower) &&
-    !isRealtimeQuery;
+  // Conversational greetings and short acknowledgments
+  const isShortGreetingOrAck =
+    /^(?:hi|hello|hey|ok|okay|thanks|thank\s+you|good\s+morning|good\s+evening)\b/i.test(lower) &&
+    clean.length < 20;
 
-  if (isPretrainedDomain) {
+  if (isPureCodeOrMath || isShortGreetingOrAck) {
     return {
       needsLiveSearch: false,
       searchQueries: [],
-      reason: "Pretrained academic/technical domain: Fast instant response from model knowledge",
+      reason: "Pretrained technical or conversational domain: instant response from model knowledge",
     };
   }
 
+  // All real-world inquiries, current facts, office holders, politicians, leaders, news, etc. require live search
   return {
-    needsLiveSearch: isRealtimeQuery,
+    needsLiveSearch: true,
     searchQueries: [clean],
-    reason: isRealtimeQuery ? "Real-time or entity query requiring live data" : "Standard query",
+    reason: "Deep Search active: live real-time web & Google grounding",
   };
 }
 
@@ -381,11 +386,8 @@ export async function fetchStructuredAuthoritativeData(query: string): Promise<S
     if (exchange) results.push(exchange);
   }
 
-  // Chief Minister of Tamil Nadu / Office holders
-  if (lower.includes("chief minister") && lower.includes("tamil nadu")) {
-    const wiki = await fetchWikipediaRestSummary("M._K._Stalin");
-    if (wiki) results.push(wiki);
-  } else if (lower.includes("nobel prize") && (lower.includes("physics") || lower.includes("2024"))) {
+  // Notable encyclopedia entries
+  if (lower.includes("nobel prize") && (lower.includes("physics") || lower.includes("2024"))) {
     const wiki = await fetchWikipediaRestSummary("List_of_Nobel_laureates_in_Physics");
     if (wiki) results.push(wiki);
   }

@@ -110,9 +110,6 @@ export function synthesizeAcademicResponse(
       lower
     ) || /```[\s\S]*?```/.test(cleanQuery);
 
-  // Check if Chief Minister of Tamil Nadu
-  const isTNChiefMinister = lower.includes("chief minister") && lower.includes("tamil nadu");
-
   // Check identity, creator, and competitor queries across prompt & conversation history
   const allMessagesText = messages.map((m) => extractTextFromContent(m.content)).join(" ");
   const combinedContextText = `${systemText} ${allMessagesText} ${cleanQuery}`.toLowerCase();
@@ -153,8 +150,6 @@ export function synthesizeAcademicResponse(
     } else {
       directAnswer = `**Visual Inspection**: ${visualAnalysis.slice(0, 260) || "The uploaded image has been analyzed and classified."}`;
     }
-  } else if (isTNChiefMinister) {
-    directAnswer = `The current Chief Minister of Tamil Nadu is **M. K. Stalin** (Muthuvel Karunanidhi Stalin), who has been in office since May 7, 2021, and continues as the active Chief Minister as of today (${currentDate}).`;
   } else if (mathVerification) {
     directAnswer = `**${(mathVerification.problemType || "Calculus").replace(/_/g, " ")}**: ${mathVerification.verifiedResult} (Mathematically Verified)`;
   } else if (sourceItems.length > 0) {

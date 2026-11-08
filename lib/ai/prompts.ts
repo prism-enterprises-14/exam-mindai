@@ -150,7 +150,9 @@ RELEVANT KNOWLEDGE & RETRIEVED CONTEXT:
 ${params.documentContext}
 --------------------------------------------------
 GROUNDING INSTRUCTIONS:
-- Integrate verified facts from the retrieved knowledge above into your response.
+- CRITICAL: Always prioritize the live retrieved knowledge and web search results above over any static pretrained weights or training cutoff.
+- When answering questions about current events, office holders, politicians, elections, leaders, organizations, or news, you MUST base your answer on the live retrieved search results above.
+- Never state outdated historical assumptions if the live retrieved sources report a newer leader, election result, or development.
 - When referencing live web articles or sources, cite them naturally with their titles or markdown links.`;
   }
 
